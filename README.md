@@ -4,7 +4,7 @@ Where the policy iteration of reinforcement learning meets HLL.
 
 **Requirements**
 
-Python 3.6, numpy, scipy.
+pip install -r requirements.txt
 
 **How it works**
 
