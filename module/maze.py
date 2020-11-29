@@ -4,7 +4,7 @@ import numpy as np
 class Maze:
 
     def __init__(self, n: int, m:int):
-        # number of states = number of fields + game over state = n + 1
+        # number of states = number of fields + game over state = n * m + 1
         # number of actions = |{up, right, down, left}| + |{stop}| = 5
         self.probs = np.zeros((n * m + 1, n * m + 1, 5))
         self.n = n
