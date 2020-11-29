@@ -12,7 +12,7 @@ class RL:
     Class representing the policy learning procedure of an agent
     """
 
-    def __init__(self, n=10, gamma=0.85):
+    def __init__(self, n=10, m=10, gamma=0.85):
         """
         Parameters
         ----------
@@ -23,90 +23,54 @@ class RL:
         """
 
         self.n = n
+        self.m = m
         self.gamma = gamma
 
-        maze = Maze(n)
+        maze = Maze(n, m)
         self._probs = maze.construct()
         self._state_dic = maze.state_dic
         self._rand_states = maze.corner_states + maze.edge_states
 
-        exit_state = 20
-        self._rewards = np.zeros(n ** 2)
-        self._rewards[range(n ** 2)] = -1
-        self._rewards[exit_state] = 100
+        self._exit_states = maze.exit_states
+        self._rewards = np.zeros(n * m + 1)
+        self._rewards[range(n * m + 1)] = -0.04
+        self._rewards[self._exit_states[0]] = 1
+        self._rewards[self._exit_states[1]] = -1
+        self._rewards[n*m] = 0
 
-        self._curr_policy = np.zeros(n ** 2)
+        self._curr_policy = np.zeros(n * m + 1)
 
     def learn(self):
+        utility_arr = np.array(self.value_iteration())
 
-        # Contains learned policies per episode
-        learnt_policies = []
-
-        # Randomly chose a policy at the beginning by checking
-        # the allowed actions per state using the state dictionary.
-        policy_0 = np.zeros(self.n ** 2)
-        for state in self._state_dic:
-            policy_0[state] = random.choice(self._state_dic[state])
-        print("Starting policy:\n", policy_0)
-        learnt_policies.append(policy_0)
-
-        self._curr_policy = policy_0
-
-        policy_new = self.__policy_iter_step(policy_0)
-        print("Policy iter:\n", policy_new)
-        while not np.array_equal(policy_0, policy_new):
-            policy_0 = policy_new
-            learnt_policies.append(policy_0)
-            policy_new = self.__policy_iter_step(np.array(policy_0))
-            print("Policy iter:\n", policy_new)
-
-        learnt_policies = np.array(learnt_policies)
-
-        # Plot an animation containing all episodes
-        mat, fig = self._setup_grid_animation(learnt_policies)
-        ani = animation.FuncAnimation(fig, self._animate, frames=learnt_policies.shape[0],
-                                      fargs=(mat, learnt_policies),
+        # Plot an animation containing all episodes, disregarding the game-over state
+        utility_arr = utility_arr[:,:-1]
+        mat, fig = self._setup_grid_animation(utility_arr)
+        ani = animation.FuncAnimation(fig, self._animate, frames=utility_arr.shape[0],
+                                      fargs=(mat, utility_arr),
                                       interval=500)
-        ani.save('animation.gif')
+        ani.save('animation_utilities.gif')
 
-    def _setup_grid_animation(self, pol):
-
-        """
-        Sets up the animation grid.
-
-        Parameters
-        ----------
-        pol : ndarray
-                Array of learned policies per episode.
-
-        Returns
-        -------
-        mat: `~matplotlib.image.AxesImage`
-                The first image corresponding to the initial random policy.
-        fig: `~matplotlib.figure.Figure`
-
-        """
+    def _setup_grid_animation(self, utility):
 
         fig, ax = plt.subplots()
-        extent = (0, self.n, self.n, 0)
-        cmap = colors.ListedColormap(["firebrick", "midnightblue", "moccasin", "teal"])
-        mat = ax.matshow(pol[0].reshape((self.n, self.n)), extent=extent, cmap=cmap, vmin=-0.5, vmax=3.5)
+        extent = (0, self.m, self.n, 0)
+        mat = ax.matshow(utility[0].reshape((self.n, self.m)), extent=extent, cmap='GnBu')
 
-        cbar = plt.colorbar(mat, ticks=[0, 1, 2, 3])
-        cbar.set_ticklabels(["up", "right", "down", "left"])
+        cbar = plt.colorbar(mat)
         cbar.outline.set_edgecolor('white')
 
         ax.yaxis.grid(color='w', linewidth=2)
         ax.xaxis.grid(color='w', linewidth=2)
-        ax.set_xticks(range(0, self.n), minor=False)
+        ax.set_xticks(range(0, self.m), minor=False)
         ax.set_yticks(range(0, self.n), minor=False)
         ax.set_frame_on(False)
 
-        plt.axis([0, self.n, self.n, 0])
+        plt.axis([0, self.m, self.n, 0])
 
         return mat, fig
 
-    def _animate(self, i, mat, policies):
+    def _animate(self, i, mat, utilities):
         """
         This is the animation function which is called in every episode to plot the corresponding policy grid.
         The animation shows the learned state-action mapping per episode.
@@ -128,7 +92,7 @@ class RL:
         if i == 0:
             return mat
         else:
-            mat.set_data(policies[i].reshape((self.n, self.n)))
+            mat.set_data(utilities[i].reshape((self.n, self.m)))
             return mat
 
     # (a) Policy Evaluation
@@ -198,7 +162,41 @@ class RL:
         """
         return self._policy_from_utility(self._utility_from_policy(policy))
 
+    def value_iter_step(self, u):
+
+        # The sum over probabilities
+        value_vector = []
+        # Iterate over the current states
+        for k in range(self._probs.shape[1]):
+            iterations = []
+            # Iterate over the actions
+            for l in range(self._probs.shape[2]):
+                sum = 0
+                # Iterate over the next states
+                for m in range(self._probs.shape[0]):
+                    sum += self._probs[m][k][l] * u[m]
+                iterations.append(sum)
+            max_value = np.amax(iterations)
+            value_vector.append(self.gamma * max_value)
+
+        return np.add(value_vector, self._rewards)
+
+    def value_iteration(self, epsilon=1e-14, maxsteps=5000):
+        """Value iteration algorithm."""
+        u = np.zeros(self._probs.shape[1])
+        utility_iterations = []
+        for i in range(maxsteps):
+            unext = self.value_iter_step(u)
+            utility_iterations.append(unext)
+            diff = np.linalg.norm(unext - u)
+            u = unext
+            if diff <= epsilon * (1 - self.gamma) / self.gamma:
+                print('value iteration with epsilon={} completed after {} iterations'.format(epsilon, i))
+                print(u)
+                return utility_iterations
+        return u
+
 
 if __name__ == '__main__':
-    rl_system = RL(n=10)
+    rl_system = RL(n=4, m=4, gamma=1)
     rl_system.learn()
