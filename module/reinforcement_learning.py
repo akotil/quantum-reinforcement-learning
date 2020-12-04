@@ -3,6 +3,7 @@ import random
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from matplotlib import colors
+from numpy import linalg as LA
 
 from module.maze import *
 
@@ -12,39 +13,43 @@ class RL:
     Class representing the policy learning procedure of an agent
     """
 
-    def __init__(self, n=10, gamma=0.85):
+    def __init__(self, n=10, m=10, gamma=0.85):
         """
         Parameters
         ----------
         n : int, optional
-            The dimension of the grid
+            The vertical dimension of the grid
+        m : int, optional
+            The horizontal dimension of the grid
         gamma : float, optional
             The discounting factor
         """
 
         self.n = n
+        self.m = m
         self.gamma = gamma
 
-        maze = Maze(n)
+        maze = Maze(n, m)
         self._probs = maze.construct()
         self._state_dic = maze.state_dic
         self._rand_states = maze.corner_states + maze.edge_states
 
-        exit_state = 20
-        self._rewards = np.zeros(n ** 2)
-        self._rewards[range(n ** 2)] = -1
-        self._rewards[exit_state] = 100
+        self._exit_states = maze.exit_states
+        self._rewards = np.zeros(n * m + 1)
+        self._rewards[range(n * m + 1)] = -0.05
+        self._rewards[self._exit_states[0]] = 1
+        self._rewards[self._exit_states[1]] = -1
+        self._rewards[n * m] = 0
 
-        self._curr_policy = np.zeros(n ** 2)
+        self._curr_policy = np.zeros(n * m + 1)
 
     def learn(self):
-
         # Contains learned policies per episode
         learnt_policies = []
 
         # Randomly chose a policy at the beginning by checking
         # the allowed actions per state using the state dictionary.
-        policy_0 = np.zeros(self.n ** 2)
+        policy_0 = np.zeros(self.n * self.m + 1)
         for state in self._state_dic:
             policy_0[state] = random.choice(self._state_dic[state])
         print("Starting policy:\n", policy_0)
@@ -61,16 +66,17 @@ class RL:
             print("Policy iter:\n", policy_new)
 
         learnt_policies = np.array(learnt_policies)
+        #disregard the game-over state
+        learnt_policies = learnt_policies[:,:-1]
 
         # Plot an animation containing all episodes
         mat, fig = self._setup_grid_animation(learnt_policies)
         ani = animation.FuncAnimation(fig, self._animate, frames=learnt_policies.shape[0],
                                       fargs=(mat, learnt_policies),
                                       interval=500)
-        ani.save('animation.gif')
+        ani.save('animation_policies.gif')
 
     def _setup_grid_animation(self, pol):
-
         """
         Sets up the animation grid.
 
@@ -144,8 +150,8 @@ class RL:
         The utility obtained by the current policy.
 
         """
-        tprob_pol = np.array([self._probs[:, s, int(pol[s])] for s in range(self.n ** 2)])
-        classical_result = np.linalg.solve(np.identity(self.n ** 2) - self.gamma * tprob_pol, self._rewards)
+        tprob_pol = np.array([self._probs[:, s, int(pol[s])] for s in range(self.n * self.m + 1)])
+        classical_result = np.linalg.solve(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards)
         return classical_result
 
     # (b) Policy Improvement Step
@@ -177,9 +183,9 @@ class RL:
 
         # For every action in the new policy, check if the action is allowed
         # When not, repeat the old action
-        for a, i in zip(policy, range(self.n ** 2)):
-            if a not in self._state_dic[i] and i in self._rand_states:
-                policy[i] = self._curr_policy[i]
+   #     for a, i in zip(policy, range(self.n * self.m + 1)):
+   #         if a not in self._state_dic[i] and i in self._rand_states:
+   #             policy[i] = self._curr_policy[i]
 
         return policy
 
@@ -200,5 +206,5 @@ class RL:
 
 
 if __name__ == '__main__':
-    rl_system = RL(n=10)
+    rl_system = RL(n=4, m=4, gamma=0.99)
     rl_system.learn()

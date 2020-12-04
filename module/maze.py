@@ -5,8 +5,8 @@ class Maze:
 
     def __init__(self, n: int, m:int):
         # number of states = number of fields + game over state = n * m + 1
-        # number of actions = |{up, right, down, left}| + |{stop}| = 5
-        self.probs = np.zeros((n * m + 1, n * m + 1, 5))
+        # number of actions = |{up, right, down, left}| = 4
+        self.probs = np.zeros((n * m + 1, n * m + 1, 4))
         self.n = n
         self.m = m
         self.constructed_states = []
@@ -58,7 +58,7 @@ class Maze:
                 self.probs[self.n*self.m, j, :] = 1
                 self.constructed_states.append(j)
                 self.edge_states.append(j)
-                self.state_dic[j] = [4]
+                self.state_dic[j] = [0, 1, 2, 3]
                 continue
             elif j in self.blocked_states:
                 continue
@@ -79,7 +79,7 @@ class Maze:
             if state in self.exit_states:
                 self.probs[n*m, state, :] = 1
                 self.constructed_states.append(state)
-                self.state_dic[state] = [4]
+                self.state_dic[state] = [0, 1, 2, 3]
                 continue
             elif state in self.blocked_states:
                 continue
@@ -101,7 +101,7 @@ class Maze:
         for j in remaining_states:
             if j in self.exit_states:
                 self.probs[n*m, j, :] = 1
-                self.state_dic[j] = [4]
+                self.state_dic[j] = [0, 1, 2, 3]
                 continue
             for d1 in directions:
                 for d2 in directions:
