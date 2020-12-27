@@ -34,6 +34,18 @@ class RL:
         self._state_dic = maze.state_dic
         self._rand_states = maze.corner_states + maze.edge_states
 
+        # a dictionary from states to available states
+        self._state_to_states_dic = self._state_dic
+        for i in self._state_dic.keys():
+            self._state_to_states_dic[i] = [self.get_next_state_from_action(i,j)  for j in self._state_dic[i]]
+
+        # all states except the blocked and the exit states
+        self._available_states = list(set(range(0, n * m)) - set(maze.blocked_states))
+        self._available_states = list(set(self._available_states) - set(maze.exit_states))
+
+        self._curr_utility = []
+        self._start = True
+
         self._exit_states = maze.exit_states
         self._rewards = np.zeros(n * m + 1)
         self._rewards[range(n * m + 1)] = -0.05
@@ -42,6 +54,16 @@ class RL:
         self._rewards[n * m] = 0
 
         self._curr_policy = np.zeros(n * m + 1)
+
+    def get_next_state_from_action(self, curr_state:int, action:int):
+        if action == 0:
+            return curr_state-self.m
+        elif action == 1:
+            return curr_state+1
+        elif action == 2:
+            return curr_state+self.m
+        else:
+            return curr_state-1
 
     def learn(self):
         # Contains learned policies per episode
@@ -57,12 +79,14 @@ class RL:
 
         self._curr_policy = policy_0
 
-        policy_new = self.__policy_iter_step(policy_0)
+        updated_state_index = 1
+        policy_new = self.__policy_iter_step(policy_0, updated_state_index)
         print("Policy iter:\n", policy_new)
         while not np.array_equal(policy_0, policy_new):
+            updated_state_index += 1
             policy_0 = policy_new
             learnt_policies.append(policy_0)
-            policy_new = self.__policy_iter_step(np.array(policy_0))
+            policy_new = self.__policy_iter_step(np.array(policy_0), updated_state_index%len(self._available_states))
             print("Policy iter:\n", policy_new)
 
         learnt_policies = np.array(learnt_policies)
@@ -138,7 +162,7 @@ class RL:
             return mat
 
     # (a) Policy Evaluation
-    def _utility_from_policy(self, pol):
+    def _utility_from_policy(self, pol, updated_state_index):
         """
         Parameters
         ----------
@@ -152,7 +176,17 @@ class RL:
         """
         tprob_pol = np.array([self._probs[:, s, int(pol[s])] for s in range(self.n * self.m + 1)])
         classical_result = np.linalg.solve(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards)
-        return classical_result
+
+        if self._start:
+            self._curr_utility = classical_result
+            self._start = False
+        else:
+            self._curr_utility[updated_state_index] = classical_result[updated_state_index]
+            for neighbour in self._state_to_states_dic[updated_state_index]:
+                if neighbour in self._available_states:
+                    self._curr_utility[neighbour] = classical_result[neighbour]
+
+        return self._curr_utility
 
     # (b) Policy Improvement Step
     def _policy_from_utility(self, utility):
@@ -181,16 +215,10 @@ class RL:
             max_action = np.argmax(state_sum)
             policy.append(max_action)
 
-        # For every action in the new policy, check if the action is allowed
-        # When not, repeat the old action
-   #     for a, i in zip(policy, range(self.n * self.m + 1)):
-   #         if a not in self._state_dic[i] and i in self._rand_states:
-   #             policy[i] = self._curr_policy[i]
-
         return policy
 
     # (a) + (b)
-    def __policy_iter_step(self, policy):
+    def __policy_iter_step(self, policy, updated_state_index):
         """
         Parameters
         ----------
@@ -202,9 +230,9 @@ class RL:
         list : The learned policy from the iteration.
 
         """
-        return self._policy_from_utility(self._utility_from_policy(policy))
+        return self._policy_from_utility(self._utility_from_policy(policy, updated_state_index))
 
 
 if __name__ == '__main__':
-    rl_system = RL(n=4, m=4, gamma=0.99)
+    rl_system = RL(n=4, m=4, gamma=0.90)
     rl_system.learn()
