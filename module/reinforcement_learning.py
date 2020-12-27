@@ -35,7 +35,7 @@ class RL:
         self._rand_states = maze.corner_states + maze.edge_states
 
         # a dictionary from states to available states
-        self._state_to_states_dic = self._state_dic
+        self._state_to_states_dic = {}
         for i in self._state_dic.keys():
             self._state_to_states_dic[i] = [self.get_next_state_from_action(i,j)  for j in self._state_dic[i]]
 
@@ -82,8 +82,12 @@ class RL:
         updated_state_index = 1
         policy_new = self.__policy_iter_step(policy_0, updated_state_index)
         print("Policy iter:\n", policy_new)
-        while not np.array_equal(policy_0, policy_new):
+   #     while not np.array_equal(policy_0, policy_new):
+        for i in range(20):
             updated_state_index += 1
+            if updated_state_index%len(self._available_states) == 6 or updated_state_index%len(self._available_states) == 13:
+                updated_state_index += 1
+
             policy_0 = policy_new
             learnt_policies.append(policy_0)
             policy_new = self.__policy_iter_step(np.array(policy_0), updated_state_index%len(self._available_states))
