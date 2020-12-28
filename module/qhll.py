@@ -1,7 +1,8 @@
 import numpy as np
 import scipy
 from scipy import linalg
-
+from nptyping import NDArray, Float
+from typing import Any
 
 def rescale_eigenvalues(A, b):
     mul_factor = 0.5
@@ -49,7 +50,7 @@ def prepare_hhl(A, b):
     return A, b, transformed, scaled
 
 
-def hhl(A, b, epsilon, T):
+def hhl(A: NDArray[(Any, Any), Float], b: NDArray[Any, Float], epsilon: Float, T: int) -> NDArray[Any, Float]:
     A, b, transformed, scaled = prepare_hhl(A, b)
 
     # Calculate the singular values of A to set k
@@ -58,19 +59,19 @@ def hhl(A, b, epsilon, T):
     print('condition number k: ', k)
 
     # Calculate basis coefficients for phi_0 and the registers containing phi_0 and b
-    phi_0 = [np.sqrt(2 / T) * np.sin(np.pi * (i + 1 / 2) / T) for i in range(T)]
+    phi_0 = [np.sqrt(2 / T) * np.sin(np.pi * (i + 1 / 2) / T)
+             for i in range(T)]
     registers = np.kron(phi_0, b)
 
     # Hamiltonian Evolution
     n = A.shape[0]
-    H = np.zeros((T * n, T * n), dtype='complex')
+    H = np.zeros((T, n, n), dtype='complex')
     t_0 = k / epsilon
     for i in range(T):
-        H[i * n:(i + 1) * n, i * n:(i + 1) * n] = scipy.linalg.expm(1j * A * i * t_0 / T)
+        H[i] = linalg.expm(1j * A * i * t_0 / T)
 
-    # Apply Hamiltonian Evolution to the registers containing phi_0 x b
-    state = [np.dot(H[i * n:(i + 1) * n, i * n:(i + 1) * n],
-                    registers[i * n:(i + 1) * n]) for i in range(T)]
+    # Apply Hamiltonian Evolution to the input registers
+    state = [np.dot(H[i], registers.reshape((T, n))[i]) for i in range(T)]
 
     # Apply Fourier Transformation to the first register
     state = np.fft.fft(state, axis=0, norm='ortho')
@@ -91,8 +92,7 @@ def hhl(A, b, epsilon, T):
     one_state = np.fft.ifft(one_state, axis=0, norm='ortho')
 
     # Inverse Hamiltonian Evaluation
-    one_state = [np.dot(H[i * n:(i + 1) * n, i * n:(i + 1) * n].conj().T,
-                        one_state.ravel()[i * n:(i + 1) * n]) for i in range(T)]
+    one_state = [np.dot(H[i].conj().T, one_state[i]) for i in range(T)]
 
     # Inverse phi_0 by reversing the Kronecker Product
     one_state /= C
@@ -110,8 +110,8 @@ def main():
     b = np.random.random(n)
     A = np.random.random((n, n))
 
-    T = 1000
-    epsilon = 0.01
+    T = 5000
+    epsilon = 0.001
     x = hhl(A, b, epsilon, T)
 
     print('x:\n', x)
