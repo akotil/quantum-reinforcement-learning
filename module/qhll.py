@@ -1,8 +1,6 @@
 import numpy as np
 import scipy
 from scipy import linalg
-from nptyping import NDArray, Float
-from typing import Any
 
 def rescale_eigenvalues(A, b):
     mul_factor = 0.5
@@ -50,7 +48,19 @@ def prepare_hhl(A, b):
     return A, b, transformed, scaled
 
 
-def hhl(A: NDArray[(Any, Any), Float], b: NDArray[Any, Float], epsilon: Float, T: int) -> NDArray[Any, Float]:
+def hhl(A, b, epsilon, T):
+    """
+    :param A: ndarray
+            2d array containing the input matrix
+    :param b: ndarray
+            1d array containing the right hand side
+    :param epsilon: float
+            error constant
+    :param T: int
+            Hamiltonian evolution time step
+    :return: ndarray
+            1d array containing the solution vector
+    """
     A, b, transformed, scaled = prepare_hhl(A, b)
 
     # Calculate the singular values of A to set k
@@ -80,7 +90,7 @@ def hhl(A: NDArray[(Any, Any), Float], b: NDArray[Any, Float], epsilon: Float, T
     C = 0.1 / k
     c1 = np.zeros(T, dtype='complex')
     one_state = np.zeros((T, n), dtype='complex')
-    for i in range(0, T):
+    for i in range(T):
         if not transformed:
             eigenvalue = 2 * np.pi * i / t_0
         else:
@@ -91,7 +101,7 @@ def hhl(A: NDArray[(Any, Any), Float], b: NDArray[Any, Float], epsilon: Float, T
     # Inverse Fourier Transformation
     one_state = np.fft.ifft(one_state, axis=0, norm='ortho')
 
-    # Inverse Hamiltonian Evaluation
+    # Inverse Hamiltonian Evolution
     one_state = [np.dot(H[i].conj().T, one_state[i]) for i in range(T)]
 
     # Inverse phi_0 by reversing the Kronecker Product
