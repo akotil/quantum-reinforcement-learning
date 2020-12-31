@@ -13,8 +13,8 @@ class Maze:
         # state dictionary is a mapping from every state to the state's allowed actions
         self.state_dic = {}
 
-        self.blocked_states = [6, 13]
-        self.exit_states = [7,0]
+        self.blocked_states = [10]
+        self.exit_states = [7,13]
 
         self.edge_states = []
         self.corner_states = []

@@ -3,10 +3,9 @@ import random
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from numpy import linalg as LA
 
 from module.maze import *
-
+import module.qhll as qhhl
 
 class RL:
     """
@@ -43,6 +42,9 @@ class RL:
 
         self._curr_policy = np.zeros(n * m + 1)
 
+        self.gamma_cond_dic = {}
+        self.condition_numbers = []
+
     def learn(self):
         # Contains learned policies per episode
         learnt_policies = []
@@ -74,7 +76,7 @@ class RL:
         ani = animation.FuncAnimation(fig, self._animate, frames=learnt_policies.shape[0],
                                       fargs=(mat, learnt_policies),
                                       interval=500)
-        ani.save('animation_policies.gif')
+        ani.save("./module/plots/animation_policies.gif")
 
     def _setup_grid_animation(self, pol):
         """
@@ -151,8 +153,12 @@ class RL:
 
         """
         tprob_pol = np.array([self._probs[:, s, int(pol[s])] for s in range(self.n * self.m + 1)])
+        self.condition_numbers.append(np.linalg.cond(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol))
         classical_result = np.linalg.solve(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards)
-        return classical_result
+        quantum_result = qhhl.hhl(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards, 0.01, 1000)
+        print("classical: ", classical_result)
+        print("quantum: ", quantum_result)
+        return quantum_result
 
     # (b) Policy Improvement Step
     def _policy_from_utility(self, utility):
@@ -181,12 +187,6 @@ class RL:
             max_action = np.argmax(state_sum)
             policy.append(max_action)
 
-        # For every action in the new policy, check if the action is allowed
-        # When not, repeat the old action
-   #     for a, i in zip(policy, range(self.n * self.m + 1)):
-   #         if a not in self._state_dic[i] and i in self._rand_states:
-   #             policy[i] = self._curr_policy[i]
-
         return policy
 
     # (a) + (b)
@@ -204,7 +204,6 @@ class RL:
         """
         return self._policy_from_utility(self._utility_from_policy(policy))
 
-
 if __name__ == '__main__':
-    rl_system = RL(n=4, m=4, gamma=0.99)
+    rl_system = RL(n=5, m=5, gamma=0.9)
     rl_system.learn()
