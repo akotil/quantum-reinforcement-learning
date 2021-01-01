@@ -38,6 +38,7 @@ class RL:
         self._rewards[range(n * m + 1)] = -0.05
         self._rewards[self._exit_states[0]] = 1
         self._rewards[self._exit_states[1]] = -1
+        self._rewards[self._exit_states[2]] = 1
         self._rewards[n * m] = 0
 
         self._curr_policy = np.zeros(n * m + 1)
@@ -154,10 +155,10 @@ class RL:
         """
         tprob_pol = np.array([self._probs[:, s, int(pol[s])] for s in range(self.n * self.m + 1)])
         self.condition_numbers.append(np.linalg.cond(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol))
-        classical_result = np.linalg.solve(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards)
-        quantum_result = qhhl.hhl(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards, 0.01, 1000)
-        print("classical: ", classical_result)
-        print("quantum: ", quantum_result)
+     #   classical_result = np.linalg.solve(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards)
+        quantum_result = qhhl.hhl(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards, 0.01, 5000)
+      #  print("classical: ", classical_result)
+      #  print("quantum: ", quantum_result)
         return quantum_result
 
     # (b) Policy Improvement Step
@@ -205,5 +206,5 @@ class RL:
         return self._policy_from_utility(self._utility_from_policy(policy))
 
 if __name__ == '__main__':
-    rl_system = RL(n=5, m=5, gamma=0.9)
+    rl_system = RL(n=10, m=10, gamma=0.95)
     rl_system.learn()
