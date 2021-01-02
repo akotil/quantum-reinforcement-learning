@@ -1,27 +1,23 @@
+import matplotlib.pyplot as plt
 import numpy as np
-import scipy
 from scipy import linalg
 
-def rescale_eigenvalues(A, b):
-    mul_factor = 0.5
-    multiplied = 0
+SCALE_FACTOR = 0.0
+B_NORM = 1.0
+
+def rescale_eigenvalues(A):
     eigenvalues = linalg.eigvals(A)
-
-    # λ := λ * mul_factor
-    while np.any(eigenvalues >= 0.5):
-        A *= mul_factor
-        eigenvalues = linalg.eigvals(A)
-        multiplied += 1
-
-    # b must be a unit vector if no scaling is present. Otherwise, b is scaled by the mul_factor
-    # to keep the solution vector identical to the original problem.
-    if multiplied == 0:
-        scaled = False
-        b = b / np.linalg.norm(b)
-    else:
+    scaled = False
+    if np.any(eigenvalues > 0.5):
         scaled = True
-        b *= (mul_factor ** multiplied)
-    return A, b, scaled
+        max_eigval = max([abs(i) for i in linalg.eigvals(A)])
+        A *= 1 / (2 * max_eigval)
+        global SCALE_FACTOR
+        SCALE_FACTOR = 1 / (2 * max_eigval)  # λ := λ * mul_factor
+
+    print("smallest eigenvalue: ", min([abs(i) for i in linalg.eigvals(A)]))
+    print("biggest eigenvalue: ", max([abs(i) for i in linalg.eigvals(A)]))
+    return A, scaled
 
 
 def prepare_hhl(A, b):
@@ -32,7 +28,6 @@ def prepare_hhl(A, b):
         print("A:\n", A)
     else:
         transformed = True
-        # A is not Hermitian, applying the method from the paper
         print("A is not Hermitian. Transforming A.\n")
         n = A.shape[0]
         A_trans = np.zeros((n * 2, n * 2), dtype="complex")
@@ -44,7 +39,10 @@ def prepare_hhl(A, b):
         A = A_trans
         b = b_trans
 
-    A, b, scaled = rescale_eigenvalues(A, b)
+    global B_NORM
+    B_NORM = np.linalg.norm(b)
+    b = b / B_NORM  # b must be a unit vector
+    A, scaled = rescale_eigenvalues(A)
     return A, b, transformed, scaled
 
 
@@ -57,15 +55,13 @@ def hhl(A, b, epsilon, T):
     :param epsilon: float
             error constant
     :param T: int
-            Hamiltonian evolution time step
+            number of evolution time steps
     :return: ndarray
             1d array containing the solution vector
     """
     A, b, transformed, scaled = prepare_hhl(A, b)
 
-    # Calculate the singular values of A to set k
-    s = scipy.linalg.svd(A, compute_uv=False)
-    k = s[0] / s[-1]
+    k = np.linalg.cond(A)
     print('condition number k: ', k)
 
     # Calculate basis coefficients for phi_0 and the registers containing phi_0 and b
@@ -88,15 +84,15 @@ def hhl(A, b, epsilon, T):
 
     # Conditioned rotation on the ancilla qubit
     C = 0.1 / k
-    c1 = np.zeros(T, dtype='complex')
     one_state = np.zeros((T, n), dtype='complex')
     for i in range(T):
-        if not transformed:
+        if not scaled:
             eigenvalue = 2 * np.pi * i / t_0
         else:
             eigenvalue = 2 * np.pi * i / t_0 if i < T // 2 else 2 * np.pi * (i - T) / t_0
-        c1[i] = C / eigenvalue if C <= abs(eigenvalue) else 0
-        one_state[i] = state[i] * c1[i]
+
+        c_1 = C / eigenvalue if C <= abs(eigenvalue) else 0
+        one_state[i] = c_1 * state[i]
 
     # Inverse Fourier Transformation
     one_state = np.fft.ifft(one_state, axis=0, norm='ortho')
@@ -108,23 +104,41 @@ def hhl(A, b, epsilon, T):
     one_state /= C
     solution = one_state[T // 2] / phi_0[T // 2]
 
+    solution *= SCALE_FACTOR
+    solution *= B_NORM
+
     if transformed:
+        values_re = []
+        values_im = []
+        for i in range(T):
+            values_re.append((one_state[i] / phi_0[i]).real[n // 2 - 1])
+            values_im.append((one_state[i] / phi_0[i]).imag[n // 2 - 1])
+
+        plt.plot(list(range(T)), values_re, label=(r'$Re(x_1)$'))
+        plt.plot(list(range(T)), values_im, label=(r'$Im(x_1)$'))
+        plt.yscale("symlog")
+        plt.xlabel('i')
+        plt.ylabel(r'$x_1$')
+        plt.legend()
+        plt.savefig("./module/plots/psi_plot.png")
+        plt.show()
         return solution[n // 2:]
     else:
         return solution
 
 
 def main():
-    n = 4
-
+    n = 5
     b = np.random.random(n)
-    A = np.random.random((n, n))
+    A = np.random.random((n, n)) + 1j * np.random.random((n, n))
 
     T = 5000
-    epsilon = 0.001
+    epsilon = 0.01
     x = hhl(A, b, epsilon, T)
 
     print('x:\n', x)
+    residue = np.linalg.norm(np.dot(A, x) - b)
+    print('residue: ', residue)
 
     # classical solution
     x_cl = np.linalg.solve(A, b)
