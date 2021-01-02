@@ -4,15 +4,15 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from matplotlib import colors
 
-from module.maze import *
 import module.qhll as qhhl
+from module.maze import *
 
 class RL:
     """
     Class representing the policy learning procedure of an agent
     """
 
-    def __init__(self, n=10, m=10, gamma=0.85):
+    def __init__(self, n=10, m=10, gamma=0.85, quantum=False):
         """
         Parameters
         ----------
@@ -27,6 +27,7 @@ class RL:
         self.n = n
         self.m = m
         self.gamma = gamma
+        self.quantum = quantum
 
         maze = Maze(n, m)
         self._probs = maze.construct()
@@ -46,6 +47,11 @@ class RL:
         self.gamma_cond_dic = {}
         self.condition_numbers = []
 
+        self._utilities = []
+
+        self.classical_results = []
+        self.quantum_results = []
+
     def learn(self):
         # Contains learned policies per episode
         learnt_policies = []
@@ -55,7 +61,15 @@ class RL:
         policy_0 = np.zeros(self.n * self.m + 1)
         for state in self._state_dic:
             policy_0[state] = random.choice(self._state_dic[state])
-        print("Starting policy:\n", policy_0)
+   #     print("Starting policy:\n", policy_0)
+
+        # for testing purposes
+        policy_0 = [1, 2, 1, 2, 1, 1, 3, 3, 3, 3, 1, 2, 0, 0, 2, 0, 1, 0, 1, 0, 1, 3, 3, 1,
+                    1, 1, 0, 3, 1, 3, 3, 1, 0, 3, 0, 1, 0, 1, 3, 2, 1, 3, 3, 0, 0, 1, 2, 1,
+                    0, 2, 0, 1, 2, 3, 0, 3, 0, 0, 3, 2, 0, 3, 2, 0, 3, 2, 0, 2, 0, 3, 1, 3,
+                    1, 0, 1, 3, 1, 3, 2, 2, 2, 0, 0, 2, 2, 0, 3, 0, 0, 2, 0, 0, 1, 0, 0, 1,
+                    3, 0, 3, 3, 0]
+
         learnt_policies.append(policy_0)
 
         self._curr_policy = policy_0
@@ -69,9 +83,13 @@ class RL:
             print("Policy iter:\n", policy_new)
 
         learnt_policies = np.array(learnt_policies)
-        #disregard the game-over state
-        learnt_policies = learnt_policies[:,:-1]
+        # disregard the game-over state
+        learnt_policies = learnt_policies[:, :-1]
 
+    #    self._plot_animation(learnt_policies)
+    #    self._plot_utilities()
+
+    def _plot_animation(self, learnt_policies):
         # Plot an animation containing all episodes
         mat, fig = self._setup_grid_animation(learnt_policies)
         ani = animation.FuncAnimation(fig, self._animate, frames=learnt_policies.shape[0],
@@ -140,6 +158,16 @@ class RL:
             mat.set_data(policies[i].reshape((self.n, self.n)))
             return mat
 
+    def _plot_utilities(self):
+        fig, ax = plt.subplots()
+        utility_matrix = np.reshape(self._utilities[-1][:-1], (10, 10))
+        extent = (0, self.n, self.m, 0)
+        mat = ax.matshow(utility_matrix, cmap=plt.cm.get_cmap("Blues"), extent=extent)
+        cbar = plt.colorbar(mat)
+        cbar.outline.set_edgecolor('white')
+        plt.savefig("./module/plots/utilities.png")
+        plt.show()
+
     # (a) Policy Evaluation
     def _utility_from_policy(self, pol):
         """
@@ -155,11 +183,19 @@ class RL:
         """
         tprob_pol = np.array([self._probs[:, s, int(pol[s])] for s in range(self.n * self.m + 1)])
         self.condition_numbers.append(np.linalg.cond(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol))
-     #   classical_result = np.linalg.solve(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards)
-        quantum_result = qhhl.hhl(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards, 0.01, 5000)
-      #  print("classical: ", classical_result)
-      #  print("quantum: ", quantum_result)
-        return quantum_result
+
+        if self.quantum:
+            quantum_result = qhhl.hhl(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards, 0.01,
+                                      5000)
+            self.quantum_results.append(quantum_result)
+            result = quantum_result
+        else:
+            classical_result = np.linalg.solve(np.identity(self.n * self.m + 1) - self.gamma * tprob_pol, self._rewards)
+            self._utilities.append(classical_result)
+            self.classical_results.append(classical_result)
+            result = classical_result
+
+        return result
 
     # (b) Policy Improvement Step
     def _policy_from_utility(self, utility):
@@ -204,6 +240,7 @@ class RL:
 
         """
         return self._policy_from_utility(self._utility_from_policy(policy))
+
 
 if __name__ == '__main__':
     rl_system = RL(n=10, m=10, gamma=0.95)
