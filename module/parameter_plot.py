@@ -1,4 +1,3 @@
-from labellines import labelLine, labelLines
 import statistics
 
 import matplotlib.pyplot as plt
@@ -9,34 +8,64 @@ from scipy import linalg
 import module.qhll as qhhl
 import module.reinforcement_learning as rl
 
-def plot_gamma():
 
-    for gamma in [0.75, 0.8, 0.85, 0.9, 0.95]:
+def plot_gamma():
+    for gamma in [0.75, 0.8, 0.85, 0.9, 0.95, 0.99]:
         rl_system = rl.RL(n=10, m=10, gamma=gamma)
         rl_system.learn()
         cond_numbers = rl_system.condition_numbers
         iterations = list(range(len(cond_numbers)))
-
-        plt.plot(iterations, cond_numbers, label= r'$\gamma$: ' +str(gamma))
+        plt.plot(iterations, cond_numbers, label=r'$\gamma$: ' + str(gamma))
 
     plt.xlabel('Iteration instances')
     plt.ylabel('Condition number')
 
-    xint = []
-    locs, labels = plt.xticks()
-    for each in locs:
-        xint.append(int(each))
-  #  plt.xticks(list(range(9)))
-  #  plt.xticks(xint)
-
-  #  plt.yscale('log', base=2)
-    labelLines(plt.gca().get_lines(), zorder=2.5, xvals=(3,4))
+    plt.yscale('log')
+    #   labelLines(plt.gca().get_lines(), zorder=2)
     plt.title("n=10")
-    plt.savefig("./plots/parameter_plot.png")
+    plt.legend(loc="center right", bbox_to_anchor=(1, 0.65))
+    plt.savefig("./plots/parameter_plot2.png")
     plt.show()
 
 
-def plot_t(epsilon, n=10):
+def plot_gamma2():
+    gamma_arr = [0.75, 0.8, 0.85, 0.9, 0.95]
+    cond_arr_first = []
+    cond_arr_last = []
+
+    for gamma in gamma_arr:
+        rl_system = rl.RL(n=10, m=10, gamma=gamma)
+        rl_system.learn()
+        cond_numbers = rl_system.condition_numbers
+
+        cond_arr_first.append(cond_numbers[0])
+        cond_arr_last.append(cond_numbers[-1])
+
+    res1 = np.polyfit(gamma_arr, np.log(cond_arr_first), 1, w=np.sqrt(cond_arr_first))
+    x = np.arange(0.75, 0.98, 0.01)
+    plt.plot(x, np.exp(res1[1] + res1[0] * x))
+
+    res2 = np.polyfit(gamma_arr, np.log(cond_arr_last), 1, w=np.sqrt(cond_arr_last))
+    plt.plot(x, np.exp(res2[1] + res2[0] * x))
+
+    print("f: ", cond_arr_first)
+    print("l:", cond_arr_last)
+
+    plt.scatter(gamma_arr, cond_arr_first, label="Initial iteration")
+    plt.scatter(gamma_arr, cond_arr_last, label="Last iteration")
+
+    plt.xlabel('Gamma values')
+    plt.ylabel('Condition number')
+
+    plt.xticks(gamma_arr)
+
+    plt.title("n=10")
+    plt.legend(loc="upper left")
+    plt.savefig("./plots/parameter_plot2.png")
+    plt.show()
+
+
+def plot_t(epsilon=0.01, n=10):
     # First T-range to be tested: {10, ..., 600}
     T_arr_1 = [100 * i for i in range(1, 7)]
     # Second T-range: to be tested: {1000, ..., 10000}
@@ -48,39 +77,39 @@ def plot_t(epsilon, n=10):
     k_arr_2 = [2 ** i for i in range(6, 11)]
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
-    ax1.set_yscale('log')
-    ax2.set_yscale('log')
+    ax1.set_yscale("log")
+    ax1.set_xscale("log")
+    ax2.set_yscale("log")
+    ax2.set_xscale("log")
 
     fig.set_size_inches(12, 4)
-    ax1.set_xlim([100, 600])
-    ax2.set_xlim([1000, 10000])
 
     fig.suptitle("n=10, " r'$\epsilon$=' + str(epsilon))
 
     colors = plt.rcParams['axes.prop_cycle']()
-
     for k in k_arr_1:
         residue_arr = []
         for t in T_arr_1:
             mean_residue = get_mean_residue(k, n, t, epsilon)
             residue_arr.append(mean_residue)
-        ax1.plot(T_arr_1, residue_arr, **next(colors), label= r'$\kappa$: ' +str(k))
+        ax1.plot(T_arr_1, residue_arr, label=r'$\kappa$: ' + str(k), **next(colors))
 
     for k in k_arr_2:
         residue_arr = []
         for t in T_arr_2:
             mean_residue = get_mean_residue(k, n, t, epsilon)
             residue_arr.append(mean_residue)
-        ax2.plot(T_arr_2, residue_arr, **next(colors), label= r'$\kappa$: ' +str(k))
+        ax2.plot(T_arr_2, residue_arr, label=r'$\kappa$: ' + str(k), **next(colors))
 
     ax1.legend(loc="upper right")
     ax1.set_xlabel('T')
     ax1.set_ylabel('Residue')
+
     ax2.legend(loc="lower left")
     ax2.set_xlabel('T')
     ax2.set_ylabel('Residue')
 
-    plt.savefig("./plots/t_plot_" + str(epsilon) +".png")
+    plt.savefig("./plots/t_plot_" + str(epsilon) + ".png")
     plt.show()
 
 
@@ -106,6 +135,7 @@ def produce_matrix(condition_number, n):
     A = u @ s @ v
     return A
 
+
 def plot_cumulated_error():
     rl_system = rl.RL(n=10, m=10, gamma=0.95, quantum=True)
     rl_system.learn()
@@ -128,5 +158,6 @@ def plot_cumulated_error():
     plt.savefig("./plots/error.png")
     plt.show()
 
+
 if __name__ == '__main__':
-    plot_t(epsilon=0.01)
+    plot_t()

@@ -5,6 +5,7 @@ from scipy import linalg
 SCALE_FACTOR = 0.0
 B_NORM = 1.0
 
+
 def rescale_eigenvalues(A):
     eigenvalues = linalg.eigvals(A)
     scaled = False
@@ -86,10 +87,10 @@ def hhl(A, b, epsilon, T):
     C = 0.1 / k
     one_state = np.zeros((T, n), dtype='complex')
     for i in range(T):
-        if not scaled:
+        if not scaled or (scaled and i < T // 2):
             eigenvalue = 2 * np.pi * i / t_0
         else:
-            eigenvalue = 2 * np.pi * i / t_0 if i < T // 2 else 2 * np.pi * (i - T) / t_0
+            eigenvalue = 2 * np.pi * (i - T) / t_0
 
         c_1 = C / eigenvalue if C <= abs(eigenvalue) else 0
         one_state[i] = c_1 * state[i]
@@ -108,20 +109,7 @@ def hhl(A, b, epsilon, T):
     solution *= B_NORM
 
     if transformed:
-        values_re = []
-        values_im = []
-        for i in range(T):
-            values_re.append((one_state[i] / phi_0[i]).real[n // 2 - 1])
-            values_im.append((one_state[i] / phi_0[i]).imag[n // 2 - 1])
 
-        plt.plot(list(range(T)), values_re, label=(r'$Re(x_1)$'))
-        plt.plot(list(range(T)), values_im, label=(r'$Im(x_1)$'))
-        plt.yscale("symlog")
-        plt.xlabel('i')
-        plt.ylabel(r'$x_1$')
-        plt.legend()
-        plt.savefig("./module/plots/psi_plot.png")
-        plt.show()
         return solution[n // 2:]
     else:
         return solution
