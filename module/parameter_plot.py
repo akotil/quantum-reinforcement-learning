@@ -1,9 +1,13 @@
 import statistics
-
+import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 from scipy import linalg
+import itertools
+from module.maze import *
+import random
+import math
 
 import module.qhll as qhhl
 import module.reinforcement_learning as rl
@@ -159,5 +163,36 @@ def plot_cumulated_error():
     plt.show()
 
 
+def plot_k_n(randomized):
+    conds = []
+    dim = []
+    for i in range(4, 15):
+        for j in range(4, 15):
+            if randomized:
+                maze = Maze(i, j)
+                states = list(range(i*j))
+                maze.set_blocked_states(random.sample(states, math.ceil(i*j*0.1)))
+                non_blocked_states = [x for x in states if x not in maze.blocked_states]
+                maze.set_exit_states(random.sample(non_blocked_states, 2))
+            else:
+                maze = Maze(i, j)
+                maze.set_blocked_states([0, i*j-1])
+                maze.set_exit_states([math.floor(i*j/2), math.floor(i*j/3)])
+
+            rl_system = rl.RL(n=i, m=j, maze=maze, gamma=0.95)
+            rl_system.learn()
+            cond = rl_system.condition_numbers[-1]
+            conds.append(cond)
+            dim.append(i * j + 1)
+            print(i,j)
+    log_func = np.polyfit(np.log(dim), conds, 1)
+    x = np.arange(0, 200, 0.01)
+    plt.plot(x, log_func[0]*np.log(x) + log_func[1])
+    plt.ylim(100,)
+    plt.ylabel("Condition number")
+    plt.xlabel("Dimension")
+    plt.scatter(dim, conds)
+    plt.show()
+
 if __name__ == '__main__':
-    plot_t()
+    plot_k_n(True)

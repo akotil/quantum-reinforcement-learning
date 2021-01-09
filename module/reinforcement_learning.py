@@ -1,3 +1,4 @@
+import math
 import random
 
 import matplotlib.animation as animation
@@ -7,32 +8,42 @@ from matplotlib import colors
 import module.qhll as qhhl
 from module.maze import *
 
+
 class RL:
     """
     Class representing the policy learning procedure of an agent
     """
 
-    def __init__(self, n=10, m=10, gamma=0.85, quantum=False):
+    def __init__(self, n, m, maze=None, gamma=0.85, quantum=False, plot_enabled=False):
         """
         Parameters
         ----------
-        n : int, optional
+        n : int
             The vertical dimension of the grid
-        m : int, optional
+        m : int
             The horizontal dimension of the grid
+        maze: Maze object, optional
+            A custom maze
         gamma : float, optional
             The discounting factor
+        quantum: bool, optional
+            If quantum is set to True, the HHL Algorithm will be used for policy evaluation
+        plot_enabled: bool, optional
+            If plot_enabled is set to True, policies will be plotted as animation
+
         """
 
         self.n = n
         self.m = m
         self.gamma = gamma
         self.quantum = quantum
+        self._plot_enabled = plot_enabled
 
-        maze = Maze(n, m)
+        if maze == None:
+            maze = Maze(n, m)
+
         self._probs = maze.construct()
         self._state_dic = maze.state_dic
-        self._rand_states = maze.corner_states + maze.edge_states
 
         self._exit_states = maze.exit_states
         self._rewards = np.zeros(n * m + 1)
@@ -42,52 +53,45 @@ class RL:
         self._rewards[self._exit_states[2]] = 1
         self._rewards[n * m] = 0
 
-        self._curr_policy = np.zeros(n * m + 1)
+        self._curr_utility = np.zeros(n * m + 1)
+        self._utilities = []
 
         self.gamma_cond_dic = {}
         self.condition_numbers = []
 
-        self._utilities = []
-
         self.classical_results = []
         self.quantum_results = []
 
+        self._converged = False
+
     def learn(self):
-        # Contains learned policies per episode
-        learnt_policies = []
 
         # Randomly chose a policy at the beginning by checking
         # the allowed actions per state using the state dictionary.
         policy_0 = np.zeros(self.n * self.m + 1)
         for state in self._state_dic:
             policy_0[state] = random.choice(self._state_dic[state])
-   #     print("Starting policy:\n", policy_0)
 
         # for testing purposes
-        policy_0 = [1, 2, 1, 2, 1, 1, 3, 3, 3, 3, 1, 2, 0, 0, 2, 0, 1, 0, 1, 0, 1, 3, 3, 1,
-                    1, 1, 0, 3, 1, 3, 3, 1, 0, 3, 0, 1, 0, 1, 3, 2, 1, 3, 3, 0, 0, 1, 2, 1,
-                    0, 2, 0, 1, 2, 3, 0, 3, 0, 0, 3, 2, 0, 3, 2, 0, 3, 2, 0, 2, 0, 3, 1, 3,
-                    1, 0, 1, 3, 1, 3, 2, 2, 2, 0, 0, 2, 2, 0, 3, 0, 0, 2, 0, 0, 1, 0, 0, 1,
-                    3, 0, 3, 3, 0]
+        #      policy_0 = [1, 2, 1, 2, 1, 1, 3, 3, 3, 3, 1, 2, 0, 0, 2, 0, 1, 0, 1, 0, 1, 3, 3, 1,
+        #                  1, 1, 0, 3, 1, 3, 3, 1, 0, 3, 0, 1, 0, 1, 3, 2, 1, 3, 3, 0, 0, 1, 2, 1,
+        #                  0, 2, 0, 1, 2, 3, 0, 3, 0, 0, 3, 2, 0, 3, 2, 0, 3, 2, 0, 2, 0, 3, 1, 3,
+        #                  1, 0, 1, 3, 1, 3, 2, 2, 2, 0, 0, 2, 2, 0, 3, 0, 0, 2, 0, 0, 1, 0, 0, 1,
+        #                  3, 0, 3, 3, 0]
 
+        learnt_policies = []
         learnt_policies.append(policy_0)
+        curr_policy = policy_0
+        while not self._converged:
+            print(curr_policy)
+            learnt_policies.append(curr_policy)
+            curr_policy = self.__policy_iter_step(np.array(curr_policy))
 
-        self._curr_policy = policy_0
-
-        policy_new = self.__policy_iter_step(policy_0)
-        print("Policy iter:\n", policy_new)
-        while not np.array_equal(policy_0, policy_new):
-            policy_0 = policy_new
-            learnt_policies.append(policy_0)
-            policy_new = self.__policy_iter_step(np.array(policy_0))
-            print("Policy iter:\n", policy_new)
-
-        learnt_policies = np.array(learnt_policies)
-        # disregard the game-over state
-        learnt_policies = learnt_policies[:, :-1]
-
-    #    self._plot_animation(learnt_policies)
-    #    self._plot_utilities()
+        if self._plot_enabled:
+            learnt_policies = np.array(learnt_policies)
+            learnt_policies = learnt_policies[:, :-1]
+            self._plot_animation(learnt_policies)
+            self._plot_utilities()
 
     def _plot_animation(self, learnt_policies):
         # Plot an animation containing all episodes
@@ -195,6 +199,8 @@ class RL:
             self.classical_results.append(classical_result)
             result = classical_result
 
+        self._converged = np.allclose(self._curr_utility, result)
+        self._curr_utility = result
         return result
 
     # (b) Policy Improvement Step

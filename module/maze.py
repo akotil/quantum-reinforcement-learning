@@ -3,7 +3,7 @@ import numpy as np
 
 class Maze:
 
-    def __init__(self, n: int, m:int):
+    def __init__(self, n: int, m: int):
         # number of states = number of fields + game over state = n * m + 1
         # number of actions = |{up, right, down, left}| = 4
         self.probs = np.zeros((n * m + 1, n * m + 1, 4))
@@ -18,6 +18,12 @@ class Maze:
 
         self.edge_states = []
         self.corner_states = []
+
+    def set_blocked_states(self, blocked_indices):
+        self.blocked_states = blocked_indices
+
+    def set_exit_states(self, exit_indices):
+        self.exit_states = exit_indices
 
     def construct(self):
         n = self.n
@@ -55,7 +61,7 @@ class Maze:
     def _construct_edge(self, directions: list, start_state: int, end_state: int, step=1):
         for j in range(start_state, end_state, step):
             if j in self.exit_states:
-                self.probs[self.n*self.m, j, :] = 1
+                self.probs[self.n * self.m, j, :] = 1
                 self.constructed_states.append(j)
                 self.edge_states.append(j)
                 self.state_dic[j] = [0, 1, 2, 3]
@@ -71,13 +77,13 @@ class Maze:
 
     def _construct_corners(self):
         n = self.n
-        m= self.m
+        m = self.m
         directions = [["right", "down"], ["left", "down"], ["right", "up"], ["left", "up"]]
         corners = [0, m - 1, n * m - m, n * m - 1]
 
         for dir, state in zip(directions, corners):
             if state in self.exit_states:
-                self.probs[n*m, state, :] = 1
+                self.probs[n * m, state, :] = 1
                 self.constructed_states.append(state)
                 self.state_dic[state] = [0, 1, 2, 3]
                 continue
@@ -96,11 +102,10 @@ class Maze:
         m = self.m
         directions = ["left", "right", "down", "up"]
         all_states = range(0, n * m)
-        remaining_states = list(set(all_states) - set(self.constructed_states))
-        remaining_states = list(set(remaining_states) - set(self.blocked_states))
+        remaining_states = [x for x in all_states if x not in self.blocked_states and x not in self.constructed_states]
         for j in remaining_states:
             if j in self.exit_states:
-                self.probs[n*m, j, :] = 1
+                self.probs[n * m, j, :] = 1
                 self.state_dic[j] = [0, 1, 2, 3]
                 continue
             for d1 in directions:
@@ -110,9 +115,9 @@ class Maze:
             self.state_dic[j] = [self._get_identifier(dir) for dir in directions]
 
     def _construct_game_over(self):
-        n=self.n
-        m=self.m
-        self.probs[n*m,n*m,:] = 1
+        n = self.n
+        m = self.m
+        self.probs[n * m, n * m, :] = 1
 
     def _assign_probability(self, curr_state: int, direction: str, action: str, corner=False, edge=False):
         n = self.n
@@ -132,10 +137,8 @@ class Maze:
 
         self.probs[self._get_nstate_from_dir(curr_state, direction)][curr_state][act] = probability
 
-
     def _get_nstate_from_dir(self, curr_state, direction):
-        n = self.n
-        m= self.m
+        m = self.m
         if direction == "up" and not curr_state - m in self.blocked_states:
             return curr_state - m
         elif direction == "right" and not curr_state + 1 in self.blocked_states:
