@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy import linalg
 
@@ -63,7 +62,6 @@ def hhl(A, b, epsilon, T):
     A, b, transformed, scaled = prepare_hhl(A, b)
 
     k = np.linalg.cond(A)
-    print('condition number k: ', k)
 
     # Calculate basis coefficients for phi_0 and the registers containing phi_0 and b
     phi_0 = [np.sqrt(2 / T) * np.sin(np.pi * (i + 1 / 2) / T)
@@ -119,7 +117,6 @@ def main():
     n = 5
     b = np.random.random(n)
     A = np.random.random((n, n)) + 1j * np.random.random((n, n))
-
     T = 5000
     epsilon = 0.01
     x = hhl(A, b, epsilon, T)

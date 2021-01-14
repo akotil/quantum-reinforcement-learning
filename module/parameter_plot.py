@@ -1,71 +1,71 @@
-import statistics
-import seaborn as sns
-import matplotlib.pyplot as plt
-import numpy as np
-import scipy as sp
-from scipy import linalg
-import itertools
-from module.maze import *
-import random
 import math
+import random
+import statistics
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import scipy as sp
+from labellines import labelLines
+from scipy import linalg
+from scipy.optimize import curve_fit
 
 import module.qhll as qhhl
 import module.reinforcement_learning as rl
+from module.maze import *
 
 
 def plot_gamma():
-    for gamma in [0.75, 0.8, 0.85, 0.9, 0.95, 0.99]:
-        rl_system = rl.RL(n=10, m=10, gamma=gamma)
-        rl_system.learn()
+    plt.style.use('ggplot')
+    plt.rcParams['font.size'] = 10
+    mpl.rcParams['axes.prop_cycle'] = plt.cycler(color=plt.cm.get_cmap("tab20b").colors)
+
+    for gamma in [0.75, 0.8, 0.85, 0.9, 0.95]:
+        rl_system = rl.RL(n=10, m=10, gamma=gamma, testing=True)
+        rl_system.learn(testing=True)
         cond_numbers = rl_system.condition_numbers
         iterations = list(range(len(cond_numbers)))
         plt.plot(iterations, cond_numbers, label=r'$\gamma$: ' + str(gamma))
 
     plt.xlabel('Iteration instances')
-    plt.ylabel('Condition number')
+    plt.ylabel(r'$\kappa$')
 
     plt.yscale('log')
-    #   labelLines(plt.gca().get_lines(), zorder=2)
-    plt.title("n=10")
-    plt.legend(loc="center right", bbox_to_anchor=(1, 0.65))
+    labelLines(plt.gca().get_lines(), zorder=2)
     plt.savefig("./plots/parameter_plot2.png")
     plt.show()
 
 
 def plot_gamma2():
+    plt.style.use('ggplot')
+    plt.rcParams['font.size'] = 10
+
     gamma_arr = [0.75, 0.8, 0.85, 0.9, 0.95]
     cond_arr_first = []
     cond_arr_last = []
 
     for gamma in gamma_arr:
-        rl_system = rl.RL(n=10, m=10, gamma=gamma)
-        rl_system.learn()
+        rl_system = rl.RL(n=10, m=10, gamma=gamma, testing=True)
+        rl_system.learn(testing=True)
         cond_numbers = rl_system.condition_numbers
 
         cond_arr_first.append(cond_numbers[0])
         cond_arr_last.append(cond_numbers[-1])
 
     res1 = np.polyfit(gamma_arr, np.log(cond_arr_first), 1, w=np.sqrt(cond_arr_first))
-    x = np.arange(0.75, 0.98, 0.01)
-    plt.plot(x, np.exp(res1[1] + res1[0] * x))
-
-    res2 = np.polyfit(gamma_arr, np.log(cond_arr_last), 1, w=np.sqrt(cond_arr_last))
-    plt.plot(x, np.exp(res2[1] + res2[0] * x))
 
     print("f: ", cond_arr_first)
     print("l:", cond_arr_last)
 
-    plt.scatter(gamma_arr, cond_arr_first, label="Initial iteration")
-    plt.scatter(gamma_arr, cond_arr_last, label="Last iteration")
+    plt.plot(gamma_arr, cond_arr_first, label="Initial iteration", color="indigo")
+    plt.plot(gamma_arr, cond_arr_last, '--', label="Last iteration", color="red")
 
-    plt.xlabel('Gamma values')
-    plt.ylabel('Condition number')
+    plt.xlabel(r'$\gamma$')
+    plt.ylabel(r'$\kappa$')
 
     plt.xticks(gamma_arr)
 
-    plt.title("n=10")
     plt.legend(loc="upper left")
-    plt.savefig("./plots/parameter_plot2.png")
+    plt.savefig("./plots/parameter_plot1.png")
     plt.show()
 
 
@@ -118,7 +118,6 @@ def plot_t(epsilon=0.01, n=10):
 
 
 def get_mean_residue(condition_number, n, T, epsilon):
-    # Repeat the hhl algorithm 10 times with 10 random matrices to get a mean residue
     residue_arr = []
     for i in range(0, 5):
         A = produce_matrix(condition_number, n)
@@ -141,24 +140,33 @@ def produce_matrix(condition_number, n):
 
 
 def plot_cumulated_error():
-    rl_system = rl.RL(n=10, m=10, gamma=0.95, quantum=True)
-    rl_system.learn()
+    rl_system = rl.RL(n=10, m=10, gamma=0.95, quantum=True, testing=True)
+    rl_system.learn(testing=True)
     q_results = rl_system.quantum_results
 
-    rl_system = rl.RL(n=10, m=10, gamma=0.95, quantum=False)
-    rl_system.learn()
+    rl_system = rl.RL(n=10, m=10, gamma=0.95, quantum=False, testing=True)
+    rl_system.learn(testing=True)
     c_results = rl_system.classical_results
 
     iterations = list(range(len(q_results)))
-    diff_arr = []
-    for i in iterations:
-        diff = list(np.array(c_results[i]) - np.array(q_results[i]))
-        diff_arr.append(np.linalg.norm(diff))
 
-    plt.plot(iterations, diff_arr)
+    q_norms = []
+    c_norms = []
+    for i in iterations:
+        q_norms.append(np.linalg.norm(q_results[i]))
+        c_norms.append(np.linalg.norm(c_results[i]))
+
+    plt.style.use('ggplot')
+    plt.rcParams['font.size'] = 11
+
+    plt.vlines(x=iterations, ymin=q_norms, ymax=c_norms, color='dimgrey', alpha=0.4)
+    plt.plot(iterations, c_norms, color='deepskyblue', label="classical")
+    plt.plot(iterations, q_norms, '--', color='darkblue', label="quantum")
+
+    plt.xticks(iterations)
     plt.xlabel('Iteration instances')
-    plt.ylabel('Error')
-    plt.title("n=10, " r'$\epsilon$=0.01')
+    plt.ylabel(r'$\||x||$')
+    plt.legend()
     plt.savefig("./plots/error.png")
     plt.show()
 
@@ -166,33 +174,42 @@ def plot_cumulated_error():
 def plot_k_n(randomized):
     conds = []
     dim = []
-    for i in range(4, 15):
-        for j in range(4, 15):
-            if randomized:
-                maze = Maze(i, j)
-                states = list(range(i*j))
-                maze.set_blocked_states(random.sample(states, math.ceil(i*j*0.1)))
-                non_blocked_states = [x for x in states if x not in maze.blocked_states]
-                maze.set_exit_states(random.sample(non_blocked_states, 2))
-            else:
-                maze = Maze(i, j)
-                maze.set_blocked_states([0, i*j-1])
-                maze.set_exit_states([math.floor(i*j/2), math.floor(i*j/3)])
+    for k in range(2):
+        for i in range(4, 15):
+            for j in range(4, 15):
+                if randomized:
+                    maze = Maze(i, j)
+                    states = list(range(i * j))
+                    maze.set_blocked_states(random.sample(states, math.ceil(i * j * 0.1)))
+                    non_blocked_states = [x for x in states if x not in maze.blocked_states]
+                    maze.set_exit_states(random.sample(non_blocked_states, 2))
+                else:
+                    maze = Maze(i, j)
+                    maze.set_blocked_states([1, math.ceil(i * j / 2), i * j - 2])
+                    maze.set_exit_states([0, i * j - 1])
 
-            rl_system = rl.RL(n=i, m=j, maze=maze, gamma=0.95)
-            rl_system.learn()
-            cond = rl_system.condition_numbers[-1]
-            conds.append(cond)
-            dim.append(i * j + 1)
-            print(i,j)
-    log_func = np.polyfit(np.log(dim), conds, 1)
+                rl_system = rl.RL(n=i, m=j, maze=maze, gamma=0.95)
+                rl_system.learn()
+                cond = rl_system.condition_numbers[-1]
+                conds.append(cond)
+                dim.append(i * j + 1)
+                print(i, j)
+    #  log_func = np.polyfit(np.log(dim), conds, 1, w=np.sqrt(conds))
+    param, _ = curve_fit(l, dim, conds)
+
     x = np.arange(0, 200, 0.01)
-    plt.plot(x, log_func[0]*np.log(x) + log_func[1])
-    plt.ylim(100,)
+    plt.plot(x, param[0] * np.log(param[1] * x + param[2]) + param[3])
+    plt.ylim(115, )
     plt.ylabel("Condition number")
     plt.xlabel("Dimension")
     plt.scatter(dim, conds)
+    plt.savefig("./plots/k_e_randomized_" + str(randomized) + ".png")
     plt.show()
 
+
+def l(x, a, b, c, d):
+    return a * np.log(b * x + c) + d
+
+
 if __name__ == '__main__':
-    plot_k_n(True)
+    plot_gamma()

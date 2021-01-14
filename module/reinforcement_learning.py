@@ -14,7 +14,7 @@ class RL:
     Class representing the policy learning procedure of an agent
     """
 
-    def __init__(self, n, m, maze=None, gamma=0.85, quantum=False, plot_enabled=False):
+    def __init__(self, n, m, maze=None, gamma=0.85, quantum=False, plot_enabled=False, testing=False):
         """
         Parameters
         ----------
@@ -50,7 +50,8 @@ class RL:
         self._rewards[range(n * m + 1)] = -0.05
         self._rewards[self._exit_states[0]] = 1
         self._rewards[self._exit_states[1]] = -1
-        self._rewards[self._exit_states[2]] = 1
+        if testing:
+            self._rewards[self._exit_states[2]] = 1
         self._rewards[n * m] = 0
 
         self._curr_utility = np.zeros(n * m + 1)
@@ -64,7 +65,7 @@ class RL:
 
         self._converged = False
 
-    def learn(self):
+    def learn(self, testing=False):
 
         # Randomly chose a policy at the beginning by checking
         # the allowed actions per state using the state dictionary.
@@ -73,11 +74,12 @@ class RL:
             policy_0[state] = random.choice(self._state_dic[state])
 
         # for testing purposes
-        #      policy_0 = [1, 2, 1, 2, 1, 1, 3, 3, 3, 3, 1, 2, 0, 0, 2, 0, 1, 0, 1, 0, 1, 3, 3, 1,
-        #                  1, 1, 0, 3, 1, 3, 3, 1, 0, 3, 0, 1, 0, 1, 3, 2, 1, 3, 3, 0, 0, 1, 2, 1,
-        #                  0, 2, 0, 1, 2, 3, 0, 3, 0, 0, 3, 2, 0, 3, 2, 0, 3, 2, 0, 2, 0, 3, 1, 3,
-        #                  1, 0, 1, 3, 1, 3, 2, 2, 2, 0, 0, 2, 2, 0, 3, 0, 0, 2, 0, 0, 1, 0, 0, 1,
-        #                  3, 0, 3, 3, 0]
+        if testing:
+            policy_0 = [1, 2, 1, 2, 1, 1, 3, 3, 3, 3, 1, 2, 0, 0, 2, 0, 1, 0, 1, 0, 1, 3, 3, 1,
+                    1, 1, 0, 3, 1, 3, 3, 1, 0, 3, 0, 1, 0, 1, 3, 2, 1, 3, 3, 0, 0, 1, 2, 1,
+                    0, 2, 0, 1, 2, 3, 0, 3, 0, 0, 3, 2, 0, 3, 2, 0, 3, 2, 0, 2, 0, 3, 1, 3,
+                    1, 0, 1, 3, 1, 3, 2, 2, 2, 0, 0, 2, 2, 0, 3, 0, 0, 2, 0, 0, 1, 0, 0, 1,
+                    3, 0, 3, 3, 0]
 
         learnt_policies = []
         learnt_policies.append(policy_0)
@@ -229,7 +231,6 @@ class RL:
                 state_sum.append(action_sum)
             max_action = np.argmax(state_sum)
             policy.append(max_action)
-
         return policy
 
     # (a) + (b)
@@ -249,5 +250,5 @@ class RL:
 
 
 if __name__ == '__main__':
-    rl_system = RL(n=10, m=10, gamma=0.95)
-    rl_system.learn()
+    rl_system = RL(n=10, m=10, gamma=0.95, testing=True, quantum=True)
+    rl_system.learn(testing=True)
